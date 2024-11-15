@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
     provider = "mongodb"
-    url      = "mongodb+srv://aikidsapp:Y5HuNZb4HwLs9Ofl@aiapp.yt3ly.mongodb.net/aikids?retryWrites=true&w=majority&appName=AIApp"
+    url      = env("MONGO_DB_URL")
 }
 
 model ChatSession {

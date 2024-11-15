@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "target": "es5",
     "module": "esnext",
@@ -14,6 +18,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "baseUrl": ".",
     "downlevelIteration": true,
     "plugins": [
       {
@@ -21,10 +26,14 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
     "moduleResolution": "bundler",
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "environment.d.js",
@@ -40,5 +49,7 @@
     "prisma/**/*.js",
     "modules/speech/utils/date-grouping.js"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { OpenAI } from 'openai'
 
-import { env } from '@/env'
+import env from '@/env'
 import { SYSTEM_PROMPT } from '@/packages/constant/speech-ai-prompts'
 
 const prisma = new PrismaClient()
@@ -11,9 +11,19 @@ const openai = new OpenAI({
   apiKey: env.openaiApiKey,
 })
 
-const ELEVEN_LABS_API_KEY = env.elevenLabsApiKey
+const ELEVEN_LABS_API_KEY = env.elevenLabsApiKey || process.env.ELEVEN_LABS_API_KEY
 
 export async function POST(request) {
+  if (!ELEVEN_LABS_API_KEY) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'ElevenLabs API key not configured',
+      },
+      { status: 500 }
+    )
+  }
+
   try {
     const formData = await request.formData()
     const audioFile = formData.get('audio')
