@@ -1,0 +1,39 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = "mongodb+srv://aikidsapp:Y5HuNZb4HwLs9Ofl@aiapp.yt3ly.mongodb.net/aikids?retryWrites=true&w=majority&appName=AIApp"
+}
+
+model ChatSession {
+    id        String        @id @default(auto()) @map("_id") @db.ObjectId
+    createdAt DateTime      @default(now())
+    messages  ChatMessage[]
+}
+
+model ChatMessage {
+    id         String      @id @default(auto()) @map("_id") @db.ObjectId
+    sessionId  String      @db.ObjectId
+    session    ChatSession @relation(fields: [sessionId], references: [id])
+    userInput  String
+    aiResponse String
+    timestamp  DateTime    @default(now())
+}
+
+model SpeechRecord {
+    id              String   @id @default(auto()) @map("_id") @db.ObjectId
+    userInput       String
+    aiResponse      String
+    audioUrl        String?
+    timestamp       DateTime @default(now())
+    duration        Float
+    language        String
+    topics          String[]
+    correctedText   String?
+    confidence      Float?
+    learningPoints  String[]
+    pronunciation   String?
+    isInappropriate Boolean  @default(false)
+}
