@@ -1,40 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+
 import { Container, Flex, Progress } from "@radix-ui/themes";
+
 import { useAudioRecorder } from "../../hooks/use-audio-recorder";
 import { useTextToSpeech } from "../../hooks/use-text-to-speech";
 import { AudioPlayer, RecordButton, StatusDisplay } from "../";
-
-export const sendAudioToBackend = async (blob, sessionId) => {
-  try {
-    const formData = new FormData();
-    const audioFile = new File([blob], "audio.webm", {
-      type: "audio/webm",
-      lastModified: Date.now(),
-    });
-
-    formData.append("audio", audioFile);
-    formData.append("sessionId", sessionId);
-
-    const response = await fetch("/api/speech/process", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error sending audio:", error);
-    throw error;
-  }
-};
 
 const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [response, setResponse] = useState("");
   const [progress, setProgress] = useState(0);
+  const [recordingError, setRecordingError] = useState(null);
 
   const {
     isRecording,
@@ -43,6 +19,7 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
     startRecording,
     stopRecording,
   } = useAudioRecorder();
+
   const {
     audioRef,
     audioUrl,
@@ -52,6 +29,35 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
     audioEventHandlers,
   } = useTextToSpeech();
 
+  // Mikrofon durumunu kontrol et
+  const checkMicrophoneStatus = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Microphone access is not supported in this browser");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      setRecordingError(null);
+    } catch (error) {
+      console.error("Microphone check error:", error);
+      setRecordingError(error.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkMicrophoneStatus();
+  }, [checkMicrophoneStatus]);
+
   useEffect(() => {
     let interval;
     if (isRecording) {
@@ -59,25 +65,28 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
         setProgress((prev) => (prev + 1) % 100);
       }, 50);
     }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
+    return () => clearInterval(interval);
   }, [isRecording]);
 
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isRecording) {
-        handleStopRecording();
-      }
-    };
+  const handleMouseDown = async (e) => {
+    e.preventDefault();
+    setRecordingError(null);
 
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isRecording]);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setRecordingError("Microphone access is not supported in this browser");
+      return;
+    }
+
+    if (e.button === 0 && !isProcessing && isEnabled) {
+      try {
+        setResponse("");
+        await startRecording();
+      } catch (error) {
+        console.error("Start recording error:", error);
+        setRecordingError(error.message);
+      }
+    }
+  };
 
   const handleStopRecording = async () => {
     try {
@@ -91,13 +100,8 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
 
       if (result?.success && result?.data) {
         setResponse(result.data.response);
-
         if (result.data.apiKey) {
-          try {
-            await convertTextToSpeech(result.data.response, result.data.apiKey);
-          } catch (error) {
-            console.error("Text to speech error:", error);
-          }
+          await convertTextToSpeech(result.data.response, result.data.apiKey);
         }
       }
     } catch (error) {
@@ -112,19 +116,16 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
     }
   };
 
-  const handleMouseDown = async (e) => {
-    e.preventDefault();
-    if (
-      e.button === 0 &&
-      !isProcessing &&
-      hasPermission &&
-      !isRecording &&
-      isEnabled
-    ) {
-      setResponse("");
-      await startRecording();
-    }
-  };
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isRecording) {
+        handleStopRecording();
+      }
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
+  }, [isRecording]);
 
   return (
     <Container
@@ -168,8 +169,8 @@ const SpeechRecorder = ({ sessionId, isEnabled = true }) => {
           ) : (
             <RecordButton
               isRecording={isRecording}
-              hasPermission={hasPermission && isEnabled}
-              permissionError={permissionError}
+              hasPermission={hasPermission && isEnabled && !recordingError}
+              permissionError={permissionError || recordingError}
               isProcessing={isProcessing}
               onMouseDown={handleMouseDown}
             />

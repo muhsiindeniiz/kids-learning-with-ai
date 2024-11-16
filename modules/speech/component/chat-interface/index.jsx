@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+
 import { Box, Flex, Text } from "@radix-ui/themes";
+
 import { THEME } from "../../constant/styles";
 import { useChat } from "../../hooks/useChat";
 import ChatDialog from "../chat-dialog";
