@@ -1,64 +1,94 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { OpenAI } from "openai";
-import env from "@/env";
 
 const prisma = new PrismaClient();
-const openai = new OpenAI({
-  apiKey: env.openaiApiKey,
-});
 
-// API anahtarını doğrudan process.env'den al
-const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
+// Environment variables'ları kontrol fonksiyonu
+const getConfig = () => {
+  const config = {
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    elevenLabsApiKey: process.env.ELEVEN_LABS_API_KEY,
+    isProduction: process.env.NODE_ENV === "production",
+  };
 
-export async function POST(request) {
-  // API anahtarını kontrol et ve log'la
-  console.log("API Key check:", {
-    hasElevenLabsKey: !!ELEVEN_LABS_API_KEY,
-    envCheck: !!env.elevenLabsApiKey,
-    deployEnv: env.deployEnv,
+  console.log("Environment Check:", {
+    hasOpenAI: !!config.openaiApiKey,
+    hasElevenLabs: !!config.elevenLabsApiKey,
+    environment: process.env.NODE_ENV,
   });
 
-  if (!ELEVEN_LABS_API_KEY) {
-    console.error("ElevenLabs API key is missing");
+  return config;
+};
+
+export async function POST(request) {
+  const config = getConfig();
+
+  // API anahtarlarını kontrol et
+  if (!config.openaiApiKey || !config.elevenLabsApiKey) {
+    console.error("Missing API keys:", {
+      openai: !config.openaiApiKey,
+      elevenLabs: !config.elevenLabsApiKey,
+    });
+
     return NextResponse.json(
       {
         success: false,
-        error: "ElevenLabs API key not configured",
-        env: env.deployEnv, // Debug için environment bilgisini ekleyin
+        error: "API configuration error",
+        details: config.isProduction
+          ? undefined
+          : {
+              missingKeys: {
+                openai: !config.openaiApiKey,
+                elevenLabs: !config.elevenLabsApiKey,
+              },
+            },
       },
       { status: 500 }
     );
   }
 
+  // OpenAI istemcisini oluştur
+  const openai = new OpenAI({
+    apiKey: config.openaiApiKey,
+  });
+
   try {
+    // Form verilerini al
     const formData = await request.formData();
     const audioFile = formData.get("audio");
     const sessionId = formData.get("sessionId");
 
-    // İşlem detaylarını logla
-    console.log("Processing request:", {
-      hasAudioFile: !!audioFile,
+    console.log("Request data:", {
+      hasAudio: !!audioFile,
       audioType: audioFile?.type,
-      sessionId: sessionId,
-      environment: env.deployEnv,
+      hasSessionId: !!sessionId,
     });
 
+    // Giriş verilerini kontrol et
     if (!audioFile || !(audioFile instanceof Blob)) {
       return NextResponse.json(
-        { success: false, error: "Invalid audio file format" },
+        {
+          success: false,
+          error: "Invalid audio file",
+        },
         { status: 400 }
       );
     }
 
     if (!sessionId) {
       return NextResponse.json(
-        { success: false, error: "No session ID provided" },
+        {
+          success: false,
+          error: "Session ID required",
+        },
         { status: 400 }
       );
     }
 
-    const transcriptionFile = new File([audioFile], "audio.webm", {
+    // Audio dosyasını hazırla
+    const audioBuffer = await audioFile.arrayBuffer();
+    const transcriptionFile = new File([audioBuffer], "audio.webm", {
       type: "audio/webm",
     });
 
@@ -68,14 +98,21 @@ export async function POST(request) {
       file: transcriptionFile,
       model: "whisper-1",
     });
-    console.log("Transcription completed:", transcription.text);
+    console.log("Transcription result:", transcription.text);
 
-    // AI response
+    // AI yanıtı al
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: transcription.text },
+        {
+          role: "system",
+          content:
+            "You are a helpful AI assistant that helps children learn English.",
+        },
+        {
+          role: "user",
+          content: transcription.text,
+        },
       ],
       temperature: 0.7,
       max_tokens: 100,
@@ -86,7 +123,7 @@ export async function POST(request) {
       throw new Error("No response from AI");
     }
 
-    // Database kayıtları
+    // Veritabanı kayıtları
     const [chatMessage, speechRecord] = await Promise.all([
       prisma.chatMessage.create({
         data: {
@@ -117,19 +154,24 @@ export async function POST(request) {
       data: {
         transcription: transcription.text,
         response: aiResponse,
-        apiKey: ELEVEN_LABS_API_KEY,
+        apiKey: config.elevenLabsApiKey,
         messageId: chatMessage.id,
         recordId: speechRecord.id,
       },
     });
   } catch (error) {
-    console.error("API Error:", error);
+    console.error("Processing error:", error);
+
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to process speech",
-        debug: env.deployEnv === "development" ? error.stack : undefined,
+        error: "Processing failed",
+        details: config.isProduction
+          ? undefined
+          : {
+              message: error.message,
+              stack: error.stack,
+            },
       },
       { status: 500 }
     );
