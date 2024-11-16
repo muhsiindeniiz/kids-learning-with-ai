@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
-import { Box, Flex, Text } from "@radix-ui/themes";
+import { Box, Flex, Text } from '@radix-ui/themes'
 
-import { THEME } from "../../constant/styles";
-import { useChat } from "../../hooks/useChat";
-import ChatDialog from "../chat-dialog";
-import Sidebar from "../sidebar";
-import SpeechRecorder from "../speech-recorder";
-import StartChatButton from "../start-chat";
+import { THEME } from '../../constant/styles'
+import { useChat } from '../../hooks/useChat'
+import ChatDialog from '../chat-dialog'
+import Sidebar from '../sidebar'
+import SpeechRecorder from '../speech-recorder'
+import StartChatButton from '../start-chat'
 
 const ChatInterface = () => {
   const {
@@ -20,43 +20,24 @@ const ChatInterface = () => {
     startNewSession,
     fetchSessionMessages,
     setIsDialogOpen,
-    setShowRecorder,
-  } = useChat();
+  } = useChat()
 
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isStartingSession, setIsStartingSession] = useState(false);
-  const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
-    setIsInitialized(true);
-  }, []);
+    setIsInitialized(true)
+  }, [])
 
   const handleStartChat = async () => {
     try {
-      setIsStartingSession(true);
-      await startNewSession();
-      setIsRecordingEnabled(true);
+      await startNewSession()
     } catch (error) {
-      console.error("Failed to start new session:", error);
-    } finally {
-      setIsStartingSession(false);
+      console.error('Failed to start new session:', error)
     }
-  };
-
-  const handleDialogOpen = (state) => {
-    setIsDialogOpen(state);
-    // Record button'ın durumunu dialog state'ine göre ayarla
-    setIsRecordingEnabled(!state);
-  };
-
-  const handleRecordingComplete = async () => {
-    if (currentSession) {
-      await fetchSessionMessages(currentSession);
-    }
-  };
+  }
 
   return (
-    <Flex width="100%">
+    <Flex width='100%'>
       <Sidebar
         sessions={sessions}
         onSessionClick={fetchSessionMessages}
@@ -65,32 +46,26 @@ const ChatInterface = () => {
 
       <Box
         style={{
-          marginLeft: "260px",
-          width: "calc(100% - 260px)",
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          marginLeft: '260px',
+          width: 'calc(100% - 260px)',
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        <Flex
-          direction="column"
-          justify="center"
-          width="100%"
-          p="6"
-          position="relative"
-        >
+        <Flex direction='column' justify='center' width='100%' p='6' position='relative'>
           {error && (
             <Box
-              position="absolute"
-              top="4"
-              left="50%"
+              position='absolute'
+              top='4'
+              left='50%'
               style={{
-                transform: "translateX(-50%)",
-                background: "rgba(255,0,0,0.1)",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                backdropFilter: "blur(8px)",
+                transform: 'translateX(-50%)',
+                background: 'rgba(255,0,0,0.1)',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                backdropFilter: 'blur(8px)',
                 zIndex: 10,
               }}
             >
@@ -98,18 +73,15 @@ const ChatInterface = () => {
             </Box>
           )}
 
-          <Flex align="center" justify="center" width="100%">
+          <Flex align='center' justify='center' width='100%'>
             {!showRecorder ? (
-              <StartChatButton
-                onClick={handleStartChat}
-                disabled={!isInitialized || isStartingSession}
-              />
+              <StartChatButton onClick={handleStartChat} disabled={!isInitialized} />
             ) : (
               <SpeechRecorder
                 sessionId={currentSession}
-                onRecordingComplete={handleRecordingComplete}
-                isEnabled={isRecordingEnabled}
-                key={currentSession}
+                onRecordingComplete={() => {
+                  fetchSessionMessages(currentSession)
+                }}
               />
             )}
           </Flex>
@@ -118,11 +90,11 @@ const ChatInterface = () => {
 
       <ChatDialog
         isOpen={isDialogOpen}
-        onClose={() => handleDialogOpen(false)}
+        onClose={() => setIsDialogOpen(false)}
         messages={selectedSessionMessages}
       />
     </Flex>
-  );
-};
+  )
+}
 
-export default ChatInterface;
+export default ChatInterface
