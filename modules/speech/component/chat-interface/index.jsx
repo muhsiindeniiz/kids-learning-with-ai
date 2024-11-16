@@ -20,9 +20,11 @@ const ChatInterface = () => {
     startNewSession,
     fetchSessionMessages,
     setIsDialogOpen,
+    setShowRecorder,
   } = useChat();
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isStartingSession, setIsStartingSession] = useState(false);
 
   useEffect(() => {
     setIsInitialized(true);
@@ -30,9 +32,18 @@ const ChatInterface = () => {
 
   const handleStartChat = async () => {
     try {
+      setIsStartingSession(true);
       await startNewSession();
     } catch (error) {
       console.error("Failed to start new session:", error);
+    } finally {
+      setIsStartingSession(false);
+    }
+  };
+
+  const handleRecordingComplete = async () => {
+    if (currentSession) {
+      await fetchSessionMessages(currentSession);
     }
   };
 
@@ -83,14 +94,13 @@ const ChatInterface = () => {
             {!showRecorder ? (
               <StartChatButton
                 onClick={handleStartChat}
-                disabled={!isInitialized}
+                disabled={!isInitialized || isStartingSession}
               />
             ) : (
               <SpeechRecorder
                 sessionId={currentSession}
-                onRecordingComplete={() => {
-                  fetchSessionMessages(currentSession);
-                }}
+                onRecordingComplete={handleRecordingComplete}
+                key={currentSession} // Add key to force re-render when session changes
               />
             )}
           </Flex>
