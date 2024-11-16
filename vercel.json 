@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "env": {
+    "NEXT_PUBLIC_DEPLOY_ENV": "production",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "ELEVEN_LABS_API_KEY": "@eleven_labs_api_key",
+    "MONGO_DB_URL": "@mongodb_url"
+  },
+  "build": {
+    "builds": [
+        {
+            "src": "next.config.js",
+            "use": "@vercel/next"
+        }
+    ],
+    "env": {
+      "NEXT_PUBLIC_DEPLOY_ENV": "production",
+      "OPENAI_API_KEY": "@openai_api_key",
+      "ELEVEN_LABS_API_KEY": "@eleven_labs_api_key",
+      "MONGO_DB_URL": "@mongodb_url"
+    }
+  }
+}

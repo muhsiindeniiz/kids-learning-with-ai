@@ -1,149 +1,88 @@
-'use client'
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useCallback, useEffect, useState } from 'react'
-
-const DEFAULT_AUDIO_SETTINGS = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-}
+import { useAudioPermission } from "./use-audio-permission";
 
 export const useAudioRecorder = () => {
-  const [state, setState] = useState({
-    isRecording: false,
-    hasPermission: false,
-    permissionError: null,
-    recordingDuration: 0,
-  })
+  const [isRecording, setIsRecording] = useState(false);
+  const { hasPermission, permissionError, requestPermission } =
+    useAudioPermission();
 
-  const [recorder] = useState(() => {
-    const mediaRecorder = {
-      instance: null,
-      chunks: [],
-      stream: null,
-      recordingStartTime: null,
-    }
-    return mediaRecorder
-  })
-
-  const checkPermission = useCallback(async () => {
-    try {
-      const result = await navigator.permissions.query({ name: 'microphone' })
-      setState(prev => ({
-        ...prev,
-        hasPermission: result.state === 'granted',
-        permissionError: null,
-      }))
-      return result.state === 'granted'
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        hasPermission: false,
-        permissionError: error,
-      }))
-      throw error
-    }
-  }, [])
-
-  const initializeMediaStream = useCallback(
-    async (settings = DEFAULT_AUDIO_SETTINGS) => {
-      if (recorder.stream) {
-        recorder.stream.getTracks().forEach(track => track.stop())
-      }
-
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          audio: settings,
-        })
-        recorder.stream = newStream
-        return newStream
-      } catch (error) {
-        console.error('Error accessing microphone:', error)
-        await checkPermission()
-        throw error
-      }
-    },
-    [recorder, checkPermission]
-  )
+  const mediaRecorder = useRef(null);
+  const chunksRef = useRef([]);
 
   const startRecording = useCallback(async () => {
     try {
-      const audioStream = await initializeMediaStream()
-      const mediaRecorder = new MediaRecorder(audioStream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000,
-      })
+      const hasAccess = await requestPermission();
+      if (!hasAccess) {
+        throw new Error("Microphone permission denied");
+      }
 
-      recorder.chunks = []
-      recorder.recordingStartTime = Date.now()
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
-      mediaRecorder.ondataavailable = event => {
+      mediaRecorder.current = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
+      });
+
+      chunksRef.current = [];
+
+      mediaRecorder.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          recorder.chunks.push(event.data)
+          chunksRef.current.push(event.data);
         }
-      }
+      };
 
-      mediaRecorder.onstart = () => {
-        setState(prev => ({
-          ...prev,
-          isRecording: true,
-          recordingDuration: 0,
-        }))
-      }
-
-      recorder.instance = mediaRecorder
-      mediaRecorder.start(1000)
+      mediaRecorder.current.start();
+      setIsRecording(true);
     } catch (error) {
-      console.error('Start recording error:', error)
-      throw error
+      console.error("Start recording error:", error);
+      throw error;
     }
-  }, [recorder, initializeMediaStream])
+  }, [requestPermission]);
 
-  const stopRecording = useCallback(async () => {
-    if (!recorder.instance || !state.isRecording) return null
-
-    return new Promise(resolve => {
-      recorder.instance.onstop = () => {
-        const duration = (Date.now() - recorder.recordingStartTime) / 1000
-        setState(prev => ({
-          ...prev,
-          isRecording: false,
-          recordingDuration: duration,
-        }))
-
-        const audioBlob = new Blob(recorder.chunks, {
-          type: 'audio/webm;codecs=opus',
-        })
-        resolve(audioBlob)
+  const stopRecording = useCallback(() => {
+    return new Promise((resolve) => {
+      if (
+        !mediaRecorder.current ||
+        mediaRecorder.current.state === "inactive"
+      ) {
+        resolve(null);
+        return;
       }
 
-      recorder.instance.stop()
+      mediaRecorder.current.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        mediaRecorder.current.stream
+          .getTracks()
+          .forEach((track) => track.stop());
+        setIsRecording(false);
+        resolve(blob);
+      };
 
-      setTimeout(() => {
-        if (recorder.stream) {
-          recorder.stream.getTracks().forEach(track => track.stop())
-          recorder.stream = null
-        }
-      }, 100)
-    })
-  }, [recorder, state.isRecording])
+      mediaRecorder.current.stop();
+    });
+  }, []);
 
   useEffect(() => {
-    checkPermission()
     return () => {
-      if (recorder.stream) {
-        recorder.stream.getTracks().forEach(track => track.stop())
+      if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
+        mediaRecorder.current.stream
+          .getTracks()
+          .forEach((track) => track.stop());
       }
-    }
-  }, [checkPermission, recorder])
+    };
+  }, []);
 
   return {
-    isRecording: state.isRecording,
-    hasPermission: state.hasPermission,
-    permissionError: state.permissionError,
-    recordingDuration: state.recordingDuration,
+    isRecording,
+    hasPermission,
+    permissionError,
     startRecording,
     stopRecording,
-    checkPermission,
-  }
-}
+  };
+};
