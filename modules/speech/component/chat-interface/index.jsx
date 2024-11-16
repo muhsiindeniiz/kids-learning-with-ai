@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-
 import { Box, Flex, Text } from "@radix-ui/themes";
-
 import { THEME } from "../../constant/styles";
 import { useChat } from "../../hooks/useChat";
 import ChatDialog from "../chat-dialog";
@@ -25,6 +23,7 @@ const ChatInterface = () => {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
 
   useEffect(() => {
     setIsInitialized(true);
@@ -34,11 +33,18 @@ const ChatInterface = () => {
     try {
       setIsStartingSession(true);
       await startNewSession();
+      setIsRecordingEnabled(true);
     } catch (error) {
       console.error("Failed to start new session:", error);
     } finally {
       setIsStartingSession(false);
     }
+  };
+
+  const handleDialogOpen = (state) => {
+    setIsDialogOpen(state);
+    // Record button'ın durumunu dialog state'ine göre ayarla
+    setIsRecordingEnabled(!state);
   };
 
   const handleRecordingComplete = async () => {
@@ -100,7 +106,8 @@ const ChatInterface = () => {
               <SpeechRecorder
                 sessionId={currentSession}
                 onRecordingComplete={handleRecordingComplete}
-                key={currentSession} // Add key to force re-render when session changes
+                isEnabled={isRecordingEnabled}
+                key={currentSession}
               />
             )}
           </Flex>
@@ -109,7 +116,7 @@ const ChatInterface = () => {
 
       <ChatDialog
         isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        onClose={() => handleDialogOpen(false)}
         messages={selectedSessionMessages}
       />
     </Flex>
