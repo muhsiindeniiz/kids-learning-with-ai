@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { OpenAI } from 'openai'
 
-import env from '@/env'
+import {env} from '@/env'
 import { SYSTEM_PROMPT } from '@/packages/constant/speech-ai-prompts'
 
 const prisma = new PrismaClient()
